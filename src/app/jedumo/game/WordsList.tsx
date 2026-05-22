@@ -1,10 +1,23 @@
-import { Suspense } from 'react'
+"use client"
 
-async function WordsList() {
-  const res = await fetch(
-    'https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json'
-  )
-  const words: string[] = await res.json()
+import { useFrenchWords } from '@/hooks/useFrenchWords'
+
+export function WordsList() {
+  const state = useFrenchWords()
+
+  if (state.status === 'loading') {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm text-sm text-gray-400">
+        Chargement des mots…
+      </div>
+    )
+  }
+
+  if (state.status === 'error') {
+    throw state.error
+  }
+
+  const { words } = state
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -22,22 +35,6 @@ async function WordsList() {
       <p className="border-t border-gray-100 px-5 py-3 text-xs text-gray-400">
         Affichage des 500 premiers mots
       </p>
-    </div>
-  )
-}
-
-export default function DashboardPage() {
-  return (
-    <div className="p-8 space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
-
-      <Suspense fallback={
-        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm text-sm text-gray-400">
-          Chargement des mots…
-        </div>
-      }>
-        <WordsList />
-      </Suspense>
     </div>
   )
 }
