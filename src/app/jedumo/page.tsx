@@ -9,7 +9,7 @@ export default function JeuDuMoHome() {
         </h1>
         <nav>
           <a
-            href="/jedumo/lejeu"
+            href="/jedumo/game"
             className="text-sm font-medium text-blue-500 hover:underline"
           >
             Le jeu
