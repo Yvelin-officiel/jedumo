@@ -1,7 +1,7 @@
 "use client"
 
 import { useActionState, useRef, useEffect } from 'react'
-import { addCustomWord, type AddWordState } from './actions'
+import { addCustomWord, removeCustomWord, type AddWordState } from './actions'
 
 const initial: AddWordState = { error: null, success: false }
 
@@ -16,7 +16,7 @@ export function AddWordForm({ customWords }: { customWords: string[] }) {
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-900 shadow-sm">
       <div className="border-b border-zinc-700 px-5 py-4">
-        <h2 className="font-semibold text-zinc-100">Ajouter un mot</h2>
+        <h2 className="font-semibold text-zinc-100">Mes mots</h2>
       </div>
 
       <form ref={ref} action={action} className="flex gap-3 p-5">
@@ -45,12 +45,18 @@ export function AddWordForm({ customWords }: { customWords: string[] }) {
           <p className="mb-2 text-xs text-zinc-500">{customWords.length} mot(s) ajouté(s)</p>
           <div className="flex flex-wrap gap-2">
             {customWords.map((word) => (
-              <span
-                key={word}
-                className="rounded-full bg-indigo-500/10 px-3 py-1 text-sm font-medium text-indigo-300"
-              >
-                {word}
-              </span>
+              <form key={word} action={removeCustomWord.bind(null, word)}>
+                <span className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1 text-sm font-medium text-indigo-300">
+                  {word}
+                  <button
+                    type="submit"
+                    aria-label={`Supprimer ${word}`}
+                    className="text-indigo-300/70 hover:text-indigo-100"
+                  >
+                    ×
+                  </button>
+                </span>
+              </form>
             ))}
           </div>
         </div>

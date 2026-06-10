@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { GameBoard } from "./GameBoard"
 import { GameKeyboard } from "./GameKeyboard"
 import Link from "next/link"
+import { signOut } from "next-auth/react"
 
 export const WORD_LENGTH = 6
 export const MAX_ATTEMPTS = 6
@@ -39,13 +40,12 @@ function checkGuess(guess: string, target: string): LetterState[] {
   return result
 }
 
-async function fetchRandomWord(): Promise<string> {
+async function fetchWordPool(): Promise<string[]> {
   const res = await fetch(
     "https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json"
   )
   const words: string[] = await res.json()
-  const pool = words.filter((w) => /^[a-z]{6}$/.test(w))
-  return pool[Math.floor(Math.random() * pool.length)]
+  return words.filter((w) => /^[a-z]{6}$/.test(w))
 }
 
 type GameStatus = "loading" | "playing" | "won" | "lost"
@@ -58,6 +58,7 @@ export function Game({ playerName }: { playerName?: string | null }) {
   const [letterMap, setLetterMap] = useState<Record<string, LetterState>>({})
   const [shake, setShake] = useState(false)
   const [toast, setToast] = useState("")
+  const [wordSet, setWordSet] = useState<Set<string>>(new Set())
 
   const showToast = (msg: string, ms = 2500) => {
     setToast(msg)
@@ -69,7 +70,9 @@ export function Game({ playerName }: { playerName?: string | null }) {
     setResults([])
     setLetterMap({})
     setToast("")
-    const word = await fetchRandomWord()
+    const pool = await fetchWordPool()
+    setWordSet(new Set(pool))
+    const word = pool[Math.floor(Math.random() * pool.length)]
     setTarget(word)
     setCurrentGuess(word[0])
     setStatus("playing")
@@ -83,6 +86,13 @@ export function Game({ playerName }: { playerName?: string | null }) {
     if (currentGuess.length !== WORD_LENGTH) {
       setShake(true)
       showToast(`Le mot doit faire ${WORD_LENGTH} lettres`)
+      setTimeout(() => setShake(false), 500)
+      return
+    }
+
+    if (!wordSet.has(currentGuess)) {
+      setShake(true)
+      showToast("Ce mot n'existe pas dans le dictionnaire")
       setTimeout(() => setShake(false), 500)
       return
     }
@@ -115,7 +125,7 @@ export function Game({ playerName }: { playerName?: string | null }) {
     } else {
       setCurrentGuess(target[0])
     }
-  }, [currentGuess, target, results, letterMap])
+  }, [currentGuess, target, results, letterMap, wordSet])
 
   const handleKey = useCallback(
     (key: string) => {
@@ -155,6 +165,12 @@ export function Game({ playerName }: { playerName?: string | null }) {
           <Link href="/jedumo/word" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
             Mots →
           </Link>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            Déconnexion
+          </button>
         </div>
       </header>
 
