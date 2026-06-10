@@ -1,11 +1,11 @@
 "use client"
 
-import { useFrenchWords } from '@/hooks/useFrenchWords'
+import { useFrenchWords } from "@/hooks/useFrenchWords"
 
 export function WordsList() {
   const state = useFrenchWords()
 
-  if (state.status === 'loading') {
+  if (state.status === "loading") {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm text-sm text-gray-400">
         Chargement des mots…
@@ -13,7 +13,7 @@ export function WordsList() {
     )
   }
 
-  if (state.status === 'error') {
+  if (state.status === "error") {
     throw state.error
   }
 
@@ -23,7 +23,9 @@ export function WordsList() {
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between">
         <h2 className="font-semibold text-gray-800">Mots français</h2>
-        <span className="text-xs text-gray-400">{words.length.toLocaleString('fr-FR')} mots au total</span>
+        <span className="text-xs text-gray-400">
+          {words.length.toLocaleString("fr-FR")} mots au total
+        </span>
       </div>
       <div className="p-5 grid grid-cols-3 gap-1 sm:grid-cols-5 lg:grid-cols-8 max-h-64 overflow-y-auto">
         {words.slice(0, 500).map((word) => (

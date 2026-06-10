@@ -27,12 +27,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {children}
-        <nav className="w-full flex item-center justify-center">
-          <a href="/jedumo">Le jeu</a>
-        </nav>
-      </body>
+      <body className="h-full flex flex-col">{children}</body>
     </html>
   )
 }
