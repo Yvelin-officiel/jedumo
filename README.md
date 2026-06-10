@@ -20,6 +20,29 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Jedumo : pages "mots" et stratégie de cache
+
+Le module `/jedumo/word` illustre les patterns liste/détail avec données chargées côté serveur (React Server Components) :
+
+- **Liste** (`src/app/jedumo/word/page.tsx`) : récupère le dictionnaire français (~330 000 mots) via `getFrenchWords()` et affiche une page paginée (100 mots/page, navigation par `?page=`). Chaque mot est un lien vers sa page de détail.
+- **Détail** (`src/app/jedumo/word/[word]/page.tsx`) : récupère le même dictionnaire ainsi que la liste des mots personnalisés de l'utilisateur, puis affiche les caractéristiques du mot (longueur, présence dans le dictionnaire, éligibilité Motus à 6 lettres, présence dans "mes mots").
+
+### Stratégie de cache / revalidation
+
+| Donnée | Type de cache | Durée / déclencheur | Tag | Justification |
+| --- | --- | --- | --- | --- |
+| Dictionnaire français (`src/lib/frenchWords.ts`, `getFrenchWords()`) | Data Cache de `fetch` (`next: { revalidate, tags }`) | `revalidate: 86400` (24h) | `french-words` | Fichier statique externe volumineux qui évolue très rarement : une revalidation quotidienne évite de re-télécharger ~330 000 mots à chaque requête tout en gardant les données raisonnablement à jour. Le tag permet une invalidation manuelle ciblée via `revalidateTag('french-words')` si besoin. |
+| Mots personnalisés (`src/lib/customWords.ts`, stockés en cookie par utilisateur) | Aucun cache (rendu dynamique, lecture via `cookies()`) | Toujours frais (par requête) | — | Donnée propre à l'utilisateur, modifiée fréquemment via Server Actions ; elle doit refléter immédiatement l'état courant, donc pas de mise en cache. |
+
+### Revalidation après mutation
+
+Les Server Actions `addCustomWord`, `addCustomWordByValue` et `removeCustomWord` (`src/app/jedumo/word/actions.ts`) :
+
+1. Valident l'entrée côté serveur avec **Zod** (`src/validators/word.ts`).
+2. Retournent un état d'erreur exploitable par l'UI (`AddWordState`) pour afficher un message d'erreur à l'utilisateur (mot invalide, déjà présent, non authentifié...).
+3. Persistent le changement (cookie `custom_words_<email>`).
+4. Appellent `refresh()` (`next/cache`) pour rafraîchir les données dynamiques de la page courante (liste et détail) après la mutation, sans recharger toute la page.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
