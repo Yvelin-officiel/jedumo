@@ -14,3 +14,8 @@ export async function getFrenchWords(): Promise<string[]> {
 
   return res.json() as Promise<string[]>
 }
+
+export async function getPlayableWords(): Promise<string[]> {
+  const words = await getFrenchWords()
+  return words.filter((w) => /^[a-z]{2,10}$/.test(w))
+}

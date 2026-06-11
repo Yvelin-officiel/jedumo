@@ -43,23 +43,6 @@ function checkGuess(
   return result
 }
 
-let wordPoolCache: Promise<string[]> | null = null
-
-function fetchWordPool(): Promise<string[]> {
-  if (!wordPoolCache) {
-    wordPoolCache = fetch(
-      "https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json"
-    )
-      .then((res) => res.json())
-      .then((words: string[]) => words.filter((w) => /^[a-z]{2,10}$/.test(w)))
-      .catch((err) => {
-        wordPoolCache = null
-        throw err
-      })
-  }
-  return wordPoolCache
-}
-
 function pickWord(pool: string[]): { word: string; length: number } {
   const min = pool.reduce((m, w) => Math.min(m, w.length), Infinity)
   const max = pool.reduce((m, w) => Math.max(m, w.length), 0)
@@ -71,7 +54,13 @@ function pickWord(pool: string[]): { word: string; length: number } {
 
 type GameStatus = "loading" | "playing" | "won" | "lost"
 
-export function Game({ playerName }: { playerName?: string | null }) {
+export function Game({
+  playerName,
+  wordPool,
+}: {
+  playerName?: string | null
+  wordPool: string[]
+}) {
   const [status, setStatus] = useState<GameStatus>("loading")
   const [target, setTarget] = useState("")
   const [wordLength, setWordLength] = useState(5)
@@ -80,7 +69,6 @@ export function Game({ playerName }: { playerName?: string | null }) {
   const [letterMap, setLetterMap] = useState<Record<string, LetterState>>({})
   const [shake, setShake] = useState(false)
   const [toast, setToast] = useState("")
-  const [pool, setPool] = useState<string[]>([])
   const [wordSet, setWordSet] = useState<Set<string>>(new Set())
 
   const showToast = (msg: string, ms = 2500) => {
@@ -100,26 +88,9 @@ export function Game({ playerName }: { playerName?: string | null }) {
     setStatus("playing")
   }, [])
 
-  const startGame = useCallback(async () => {
-    setStatus("loading")
-    const wordPool = await fetchWordPool()
-    setPool(wordPool)
-    startRound(wordPool)
-  }, [startRound])
-
   useEffect(() => {
-    let cancelled = false
-
-    fetchWordPool().then((wordPool) => {
-      if (cancelled) return
-      setPool(wordPool)
-      startRound(wordPool)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [startRound])
+    startRound(wordPool)
+  }, [wordPool, startRound])
 
   const submitGuess = useCallback(() => {
     if (currentGuess.length !== wordLength) {
@@ -188,12 +159,8 @@ export function Game({ playerName }: { playerName?: string | null }) {
   )
 
   const replay = useCallback(() => {
-    if (pool.length === 0) {
-      startGame()
-      return
-    }
-    startRound(pool)
-  }, [pool, startGame, startRound])
+    startRound(wordPool)
+  }, [wordPool, startRound])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
