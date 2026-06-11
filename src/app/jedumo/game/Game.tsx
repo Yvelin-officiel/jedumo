@@ -43,12 +43,21 @@ function checkGuess(
   return result
 }
 
-async function fetchWordPool(): Promise<string[]> {
-  const res = await fetch(
-    "https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json"
-  )
-  const words: string[] = await res.json()
-  return words.filter((w) => /^[a-z]{2,10}$/.test(w))
+let wordPoolCache: Promise<string[]> | null = null
+
+function fetchWordPool(): Promise<string[]> {
+  if (!wordPoolCache) {
+    wordPoolCache = fetch(
+      "https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json"
+    )
+      .then((res) => res.json())
+      .then((words: string[]) => words.filter((w) => /^[a-z]{2,10}$/.test(w)))
+      .catch((err) => {
+        wordPoolCache = null
+        throw err
+      })
+  }
+  return wordPoolCache
 }
 
 function pickWord(pool: string[]): { word: string; length: number } {
