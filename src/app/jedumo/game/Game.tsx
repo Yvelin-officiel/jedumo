@@ -6,7 +6,6 @@ import { GameKeyboard } from "./GameKeyboard"
 import Link from "next/link"
 import { signOut } from "next-auth/react"
 
-export const WORD_LENGTH = 6
 export const MAX_ATTEMPTS = 6
 
 export type LetterState = "correct" | "present" | "absent"
@@ -16,8 +15,12 @@ export type GuessResult = {
   states: LetterState[]
 }
 
-function checkGuess(guess: string, target: string): LetterState[] {
-  const result: LetterState[] = Array(WORD_LENGTH).fill("absent")
+function checkGuess(
+  guess: string,
+  target: string,
+  wordLength: number
+): LetterState[] {
+  const result: LetterState[] = Array(wordLength).fill("absent")
   const targetArr = target.split("")
   const guessArr = guess.split("")
 
@@ -45,7 +48,16 @@ async function fetchWordPool(): Promise<string[]> {
     "https://raw.githubusercontent.com/words/an-array-of-french-words/master/index.json"
   )
   const words: string[] = await res.json()
-  return words.filter((w) => /^[a-z]{6}$/.test(w))
+  return words.filter((w) => /^[a-z]{2,10}$/.test(w))
+}
+
+function pickWord(pool: string[]): { word: string; length: number } {
+  const min = pool.reduce((m, w) => Math.min(m, w.length), Infinity)
+  const max = pool.reduce((m, w) => Math.max(m, w.length), 0)
+  const length = Math.floor(Math.random() * (max - min + 1)) + min
+  const candidates = pool.filter((w) => w.length === length)
+  const word = candidates[Math.floor(Math.random() * candidates.length)]
+  return { word, length }
 }
 
 type GameStatus = "loading" | "playing" | "won" | "lost"
@@ -53,11 +65,13 @@ type GameStatus = "loading" | "playing" | "won" | "lost"
 export function Game({ playerName }: { playerName?: string | null }) {
   const [status, setStatus] = useState<GameStatus>("loading")
   const [target, setTarget] = useState("")
+  const [wordLength, setWordLength] = useState(5)
   const [results, setResults] = useState<GuessResult[]>([])
   const [currentGuess, setCurrentGuess] = useState("")
   const [letterMap, setLetterMap] = useState<Record<string, LetterState>>({})
   const [shake, setShake] = useState(false)
   const [toast, setToast] = useState("")
+  const [pool, setPool] = useState<string[]>([])
   const [wordSet, setWordSet] = useState<Set<string>>(new Set())
 
   const showToast = (msg: string, ms = 2500) => {
@@ -65,27 +79,43 @@ export function Game({ playerName }: { playerName?: string | null }) {
     setTimeout(() => setToast(""), ms)
   }
 
-  const startGame = useCallback(async () => {
-    setStatus("loading")
+  const startRound = useCallback((wordPool: string[]) => {
+    const { word, length } = pickWord(wordPool)
+    setWordLength(length)
+    setWordSet(new Set(wordPool.filter((w) => w.length === length)))
+    setTarget(word)
+    setCurrentGuess(word[0])
     setResults([])
     setLetterMap({})
     setToast("")
-    const pool = await fetchWordPool()
-    setWordSet(new Set(pool))
-    const word = pool[Math.floor(Math.random() * pool.length)]
-    setTarget(word)
-    setCurrentGuess(word[0])
     setStatus("playing")
   }, [])
 
+  const startGame = useCallback(async () => {
+    setStatus("loading")
+    const wordPool = await fetchWordPool()
+    setPool(wordPool)
+    startRound(wordPool)
+  }, [startRound])
+
   useEffect(() => {
-    startGame()
-  }, [startGame])
+    let cancelled = false
+
+    fetchWordPool().then((wordPool) => {
+      if (cancelled) return
+      setPool(wordPool)
+      startRound(wordPool)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [startRound])
 
   const submitGuess = useCallback(() => {
-    if (currentGuess.length !== WORD_LENGTH) {
+    if (currentGuess.length !== wordLength) {
       setShake(true)
-      showToast(`Le mot doit faire ${WORD_LENGTH} lettres`)
+      showToast(`Le mot doit faire ${wordLength} lettres`)
       setTimeout(() => setShake(false), 500)
       return
     }
@@ -97,7 +127,7 @@ export function Game({ playerName }: { playerName?: string | null }) {
       return
     }
 
-    const states = checkGuess(currentGuess, target)
+    const states = checkGuess(currentGuess, target, wordLength)
     const newResult: GuessResult = { letters: currentGuess.split(""), states }
     const newResults = [...results, newResult]
 
@@ -115,7 +145,14 @@ export function Game({ playerName }: { playerName?: string | null }) {
 
     if (currentGuess === target) {
       setStatus("won")
-      const msgs = ["Parfait !", "Excellent !", "Bravo !", "Bien joué !", "Ouf !", "Miracle !"]
+      const msgs = [
+        "Parfait !",
+        "Excellent !",
+        "Bravo !",
+        "Bien joué !",
+        "Ouf !",
+        "Miracle !",
+      ]
       showToast(msgs[Math.min(newResults.length - 1, msgs.length - 1)], 4000)
       setCurrentGuess("")
     } else if (newResults.length >= MAX_ATTEMPTS) {
@@ -125,7 +162,7 @@ export function Game({ playerName }: { playerName?: string | null }) {
     } else {
       setCurrentGuess(target[0])
     }
-  }, [currentGuess, target, results, letterMap, wordSet])
+  }, [currentGuess, target, wordLength, results, letterMap, wordSet])
 
   const handleKey = useCallback(
     (key: string) => {
@@ -134,12 +171,20 @@ export function Game({ playerName }: { playerName?: string | null }) {
         submitGuess()
       } else if (key === "BACKSPACE") {
         setCurrentGuess((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev))
-      } else if (/^[a-zA-Z]$/.test(key) && currentGuess.length < WORD_LENGTH) {
+      } else if (/^[a-zA-Z]$/.test(key) && currentGuess.length < wordLength) {
         setCurrentGuess((prev) => prev + key.toLowerCase())
       }
     },
-    [status, currentGuess, submitGuess]
+    [status, currentGuess, wordLength, submitGuess]
   )
+
+  const replay = useCallback(() => {
+    if (pool.length === 0) {
+      startGame()
+      return
+    }
+    startRound(pool)
+  }, [pool, startGame, startRound])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -160,9 +205,14 @@ export function Game({ playerName }: { playerName?: string | null }) {
         </h1>
         <div className="flex items-center gap-4">
           {playerName && (
-            <span className="text-sm text-zinc-400">Bonjour {playerName} 👋</span>
+            <span className="text-sm text-zinc-400">
+              Bonjour {playerName} 👋
+            </span>
           )}
-          <Link href="/jedumo/word" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+          <Link
+            href="/jedumo/word"
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
             Mots →
           </Link>
           <button
@@ -190,7 +240,7 @@ export function Game({ playerName }: { playerName?: string | null }) {
             results={results}
             currentGuess={currentGuess}
             maxAttempts={MAX_ATTEMPTS}
-            wordLength={WORD_LENGTH}
+            wordLength={wordLength}
             firstLetter={target[0] ?? ""}
             shake={shake}
             gameStatus={status as "playing" | "won" | "lost"}
@@ -198,7 +248,7 @@ export function Game({ playerName }: { playerName?: string | null }) {
 
           {(status === "won" || status === "lost") && (
             <button
-              onClick={startGame}
+              onClick={replay}
               className="mt-2 mb-4 px-6 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 transition-colors text-sm font-semibold"
             >
               Rejouer
